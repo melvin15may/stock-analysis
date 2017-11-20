@@ -27,13 +27,6 @@ Few points to remember
 
 
 
-Javascript
-# msft.csv
 
-# output.csv
-
-MSFT start-time end-time PIP_output PIP_times
-e.g. MSFT 10 100 23;12;234;51;20;35;12 11;23;30;...
-
-
-APPLE start-time end-time
+MSFT PIP_output PIP_times
+e.g. MSFT 23;12;234;51;20;35;12 11;23;30;...

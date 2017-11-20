@@ -1,19 +1,23 @@
 from alpha_vantage.timeseries import TimeSeries
 from datetime import datetime
+from time import sleep
 import csv
 import pandas as pd
 import requests
 import os
 import glob
+import random
+
 
 SYMBOL_URL = "http://www.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange={}&render=download"
-STOCK_EXCHANGES = ["nasdaq", "nyse"]
+STOCK_EXCHANGES = ["nasdaq"]  # ["nasdaq", "nyse"]
+ALPHA_VANTAGE_KEY = "055UMQXJRDY71RG3"
 
 
 # Get last 7 days worth of data
 def downloadHistory_stocks(symbol, interval='1min'):
     try:
-        ts = TimeSeries(key='055UMQXJRDY71RG3', output_format='pandas')
+        ts = TimeSeries(key=ALPHA_VANTAGE_KEY, output_format='pandas')
         data, meta_data = ts.get_intraday(
             symbol=symbol, interval=interval, outputsize='full')
         pd.set_option('display.max_rows', 5000)
@@ -60,7 +64,7 @@ def get_symbols(directory_name):
             data_list = []
             for d in list(cr):
                 # print(d)
-                data_list.append(';'.join(d[:8]) + '\n')
+                data_list.append('='.join(d[:8]) + '\n')
             write_csv(os.path.join(directory_name, se + ".csv"), data_list)
 
 
@@ -69,12 +73,13 @@ def get_data():
     get_symbols("data/symbols/")
     for filename in glob.glob(os.path.join("data/symbols/", '*.csv')):
         df = read_csv(file_name=filename, names=[
-                      "Symbol", "Name", "LastSale", "MarketCap", "IPOyear", "Sector", "industry", "Summary Quote"], sep=";")
+                      "Symbol", "Name", "LastSale", "MarketCap", "IPOyear", "Sector", "industry", "Summary Quote"], sep="=")
         for chunk in df:
             symbols = chunk["Symbol"].values.tolist()
             for s in symbols:
-                print("Downloading data for ", s)
+                print("Downloading data for ", s, "Time:", datetime.now())
                 downloadHistory_stocks(s)
+                sleep(random.uniform(0, 2))
 
     return
 
