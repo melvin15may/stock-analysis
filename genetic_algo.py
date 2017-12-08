@@ -18,10 +18,10 @@ import template_patterns as tp
 import matplotlib.pyplot as plt
 
 POPULATION_SIZE = 50
-MAX_GENERATIONS = 400
+MAX_GENERATIONS = 1000
 
 # Desired segment length
-DLEN = 70
+DLEN = 29
 CROSSOVER_RATE = 0.5
 SELECTION_RATE = 1
 SEL_TOURNAMENT_SIZE = 10
@@ -97,7 +97,9 @@ def runGA(data_x,data_y):
     for g in range(MAX_GENERATIONS):
         # Statistics collection
         record = mstats.compile(pop)
-        print("Generation: " + str(g))
+        
+        #print("Generation: " + str(g))
+
         #print(record['fitness'])
         logbook.record(gen=g,**record)
 
@@ -139,16 +141,16 @@ def runGA(data_x,data_y):
         # The population is entirely replaced by the offspring
         pop[:] = offspring
 
-    print(logbook)
+    #print(logbook)
     with open('GA_log.txt','w') as f:
         f.write(logbook.__str__())
 
-    plot_statistics(logbook)
+    #plot_statistics(logbook)
 
 
 
     # Return the best individual
-    return (tools.selBest(pop,1))[0]
+    return list((tools.selBest(pop,1))[0])
 
 def my_mutate(chromo,maxVal):
     """
@@ -218,7 +220,7 @@ def evaluate(data_x,data_y,ind_set,plot_data=False):
         if(len(tmp_y) == 0):
             print("This should not happen" + str(startIdx) + ' ' + str(endIdx))
 
-        pip_y,pip_x = rc.PIP_identification(tmp_y,tmp_x,7,isNumpyFormat=True)
+        pip_y,pip_x,pip_index = rc.PIP_identification(tmp_y,tmp_x,7,isNumpyFormat=True)
 
         distortion_val, pattern_name = rc.multiple_template_matching(
                                        pip_y, pip_x, TEMPLATE_PATTERNS)

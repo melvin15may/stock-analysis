@@ -1,6 +1,7 @@
 import dataCollection as dc
 import recognizer as rz
 import genetic_algo as ga
+import template_patterns as tp
 import pandas as pd
 import sys
 import glob
@@ -13,6 +14,7 @@ import multiprocessing
 # window size
 WLEN = 29
 
+TEMPLATES_DICT = tp.template_patterns()
 
 def main():
     # 2 different states; 1: Data collection state and 2: data processing(pattern
@@ -30,25 +32,37 @@ def main():
         file_names = []
         for filename in glob.glob(os.path.join(directory_name, '*.csv')):
             file_names.append(filename)
-        file_names = file_names[:2]
-        with multiprocessing.Pool(processes=2) as pp:
+        # file_names = file_names[:2]
+        with multiprocessing.Pool(processes=3) as pp:
             results = pp.map(run_GA, file_names)
             # run_GA(file_name)
         json_data = {}
         for ind, f in enumerate(file_names):
-            json_data[os.path.basename(filename).split('.')[0]] = results[ind]
+            json_data[os.path.basename(f).split('.')[0]] = results[ind]
         with open("data/GA.txt", "w") as jf:
             json.dump(json_data, jf)
 
     else:
+        """
         data = ["symbol,pipoutput,pipoutputtime\n"]
         for filename in glob.glob(os.path.join(directory_name, '*.csv')):
             df = dc.read_csv(filename, chunksize=WLEN)
             pattern, pattern_time = get_resistance_support(df)
             for p in range(0, len(pattern)):
-                data.append(
-                    ",".join([os.path.basename(filename).split('.')[0], ";".join(map(str, pattern[p])), ";".join(pattern_time[p])]) + "\n")
+                data.append(",".join([os.path.basename(filename).split('.')[0], ";".join(
+                    map(str, pattern[p])), ";".join(pattern_time[p])]) + "\n")
 
+        dc.write_csv(data=data)
+        """
+        json_data = json.load(open("data/GA.txt"))
+        arguments = []
+        data = ["symbol,pipoutput,pipoutputtime\n"]
+        for key in json_data:
+            arguments.append((key, sorted(json_data[key]),directory_name))
+        with multiprocessing.Pool(processes=3) as pp:
+            results = pp.starmap(pattern_recog,arguments)
+        for r in results:
+            data += r
         dc.write_csv(data=data)
 
 
@@ -62,14 +76,13 @@ def run_GA(file_name):
         prices += list(map(float, data['close'].values.tolist()))
         time += data['timestamp'].values.tolist()
     prices = normalized(np.array(prices))[0]
-    print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), " Run GA for ", file_name)
-    wlength = ga.runGA(list(range(0, len(time))), prices)
-    print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), " End GA", wlength)
+    wlength = []
+    if len(prices) > 0:
+        print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), " Run GA", file_name)
+        wlength = ga.runGA(list(range(0, len(time))), prices)
+        print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+              " End GA", file_name, wlength)
     return wlength
-    """
-    with open('data/GA.txt', 'w') as jf:
-        json.dump(json_data, jf)
-    """
 
 
 # Normalize
@@ -79,45 +92,68 @@ def normalized(a, axis=0, order=1):
     return a / np.expand_dims(l2, axis)
 
 
-def get_resistance_support(data_file):
-    chunk_left_P = []
-    chunk_left_P_time = []
+def pattern_recog(key, windows, directory_name):
+    #json_data = json.load(open(json_file))
+    test_files = list(glob.glob(os.path.join(directory_name, '*.csv')))
+    data = []
+    print("Pattern recognition for", key)
+    if not os.path.join(directory_name, (key + '.csv')) in test_files:
+        print("Downloading data for ", key)
+        dc.downloadHistory_stocks(key, directory_name=directory_name)
+    prices = []
+    times = []
+    try:
+        df = dc.read_csv(os.path.join(
+            directory_name, key + '.csv'), chunksize=WLEN)
+        for d in df:
+            prices += list(map(float, d['close'].values.tolist()))
+            times += d['timestamp'].values.tolist()
+        pattern, pattern_time = get_resistance_support(prices, times, windows)
+        for p in range(0, len(pattern)):
+            data.append(",".join(
+                [key, ";".join(map(str, pattern[p])), ";".join(pattern_time[p])]) + "\n")
+    except FileNotFoundError:
+        print("File not found error", key)
+        pass
+    return data
+
+
+def get_resistance_support(prices, times, windows, recog_type="rule"):
     detected_patterns = {}
     detected_patterns_time = {}
-    for data in data_file:
-        start_row = 0
-        P = chunk_left_P + list(map(float, data['close'].values.tolist()))
-        P_time = chunk_left_P_time + data['timestamp'].values.tolist()
-        P_len = len(P)
-
+    windows = [0] + windows + [len(prices)]
+    for ind in range(1, len(windows)):
         # Remove patterns which have already been triggered
         # when current price is higher that the breakout pattern
-        P_max = max(P)
-        for k, v in list(detected_patterns.items()):
-            if k <= P_max:
-                del detected_patterns[k]
-                del detected_patterns_time[k]
+        if prices[windows[ind]:]:
+            P_max = max(prices[windows[ind]:])
+            for k, v in list(detected_patterns.items()):
+                if k <= P_max:
+                    del detected_patterns[k]
+                    del detected_patterns_time[k]
 
-        # Remove patterns which are void
-        # when the current price is lower than the support
-        P_min = min(P)
-        for k, v in list(detected_patterns.items()):
-            if min(v) > P_min:
-                del detected_patterns[k]
-                del detected_patterns_time[k]
+            # Remove patterns which are void
+            # when the current price is lower than the support
+            P_min = min(prices[windows[ind]:])
+            for k, v in list(detected_patterns.items()):
+                if min(v) > P_min:
+                    del detected_patterns[k]
+                    del detected_patterns_time[k]
 
-        while P_len >= (start_row + WLEN):
+        if (windows[ind] - windows[ind - 1]) >= 7:
             # print(P_len,start_row,start_row + WLEN)
-            SP, SP_time = rz.PIP_identification(
-                P[start_row:start_row + WLEN], P_time[start_row:start_row + WLEN])
-            # print(SP,SP_time)
-            if rz.inverse_head_and_shoulder_rule(SP):
-                detected_patterns[max(SP)] = SP
-                detected_patterns_time[max(SP)] = SP_time
-                start_row += (WLEN - 1)
-            start_row += 1
-        chunk_left_P = P[start_row:]
-        chunk_left_P_time = P_time[start_row:]
+            SP, SP_time, SP_indexes = rz.PIP_identification(prices[windows[ind - 1]:windows[ind]], times[windows[ind - 1]:windows[ind]])
+            if recog_type=="rule":
+                if rz.inverse_head_and_shoulder_rule(SP):
+                    detected_patterns[max(SP)] = SP
+                    detected_patterns_time[max(SP)] = SP_time
+                else:
+                    distortion = rz.template_matching(np.array(SP),np.array(SP_indexes), TEMPLATES_DICT['inverse head and shoulders']['y'], TEMPLATES_DICT['inverse head and shoulders']['x'])
+                    #print(distortion)
+                    #if rz.inverse_head_and_shoulder_rule(SP):
+                    if distortion < 0.12:
+                        detected_patterns[max(SP)] = SP
+                        detected_patterns_time[max(SP)] = SP_time
     return list(detected_patterns.values()), list(detected_patterns_time.values())
 
 

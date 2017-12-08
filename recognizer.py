@@ -18,7 +18,7 @@ def PIP_identification(P, P_time, Q_length=7, isNumpyFormat=False):
         print("Length cannot be zero!")
 
     if N < Q_length:
-        return [], []
+        return [], [], []
 
 
     # Converted PIP identification to Numpy, for performance
@@ -44,9 +44,9 @@ def PIP_identification(P, P_time, Q_length=7, isNumpyFormat=False):
     SP = P[pip_indexes]
     SP_time = P_time[pip_indexes]
 
-    return SP, SP_time
+    return SP, SP_time, pip_indexes
 
-def PIP_distance(pip_indexes, P3, distance, start, stop, useVD=True):
+def PIP_distance(pip_indexes, P3, distance, start, stop, useVD=False):
     """
     Input:
             is_pip: Indicator if a particular value has been identified as PIP
@@ -145,7 +145,7 @@ def inverse_head_and_shoulder_rule(SP, diff_value=0.15):
         diff(sp1, sp5) < diff_value
         diff(sp2, sp4) < diff_value
     """
-    if not SP:
+    if len(SP) == 0:
         return False
 
     if SP[3] > SP[1] or SP[3] > SP[5] or SP[1] > SP[0] or SP[1] > SP[2] or SP[5] > SP[4] or SP[5] > SP[6] or SP[2] > SP[0] or SP[4] > SP[6]:
