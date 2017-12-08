@@ -1,9 +1,14 @@
 import dataCollection as dc
 import recognizer as rz
+import genetic_algo as ga
 import pandas as pd
 import sys
 import glob
 import os
+import numpy as np
+from datetime import datetime
+import json
+import multiprocessing
 
 # window size
 WLEN = 29
@@ -21,6 +26,20 @@ def main():
 
     if state == 1:
         dc.get_data()
+    elif state == 2:
+        file_names = []
+        for filename in glob.glob(os.path.join(directory_name, '*.csv')):
+            file_names.append(filename)
+        file_names = file_names[:2]
+        with multiprocessing.Pool(processes=2) as pp:
+            results = pp.map(run_GA, file_names)
+            # run_GA(file_name)
+        json_data = {}
+        for ind, f in enumerate(file_names):
+            json_data[os.path.basename(filename).split('.')[0]] = results[ind]
+        with open("data/GA.txt", "w") as jf:
+            json.dump(json_data, jf)
+
     else:
         data = ["symbol,pipoutput,pipoutputtime\n"]
         for filename in glob.glob(os.path.join(directory_name, '*.csv')):
@@ -31,6 +50,34 @@ def main():
                     ",".join([os.path.basename(filename).split('.')[0], ";".join(map(str, pattern[p])), ";".join(pattern_time[p])]) + "\n")
 
         dc.write_csv(data=data)
+
+
+# Run GA on past data
+def run_GA(file_name):
+    json_data = {}
+    df = dc.read_csv(file_name, chunksize=WLEN)
+    prices = []
+    time = []
+    for data in df:
+        prices += list(map(float, data['close'].values.tolist()))
+        time += data['timestamp'].values.tolist()
+    prices = normalized(np.array(prices))[0]
+    print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), " Run GA for ", file_name)
+    wlength = ga.runGA(list(range(0, len(time))), prices)
+    print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), " End GA", wlength)
+    return wlength
+    """
+    with open('data/GA.txt', 'w') as jf:
+        json.dump(json_data, jf)
+    """
+
+
+# Normalize
+def normalized(a, axis=0, order=1):
+    l2 = np.atleast_1d(np.linalg.norm(a, order, axis))
+    l2[l2 == 0] = 1
+    return a / np.expand_dims(l2, axis)
+
 
 def get_resistance_support(data_file):
     chunk_left_P = []

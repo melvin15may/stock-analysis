@@ -7,11 +7,12 @@ import os
 import glob
 
 SYMBOL_URL = "http://www.nasdaq.com/screening/companies-by-name.aspx?letter=0&exchange={}&render=download"
-STOCK_EXCHANGES = ["nasdaq", "nyse"]
+#STOCK_EXCHANGES = ["nasdaq", "nyse"]
+STOCK_EXCHANGES = ["nasdaq"]
 
 
 # Get last 7 days worth of data
-def downloadHistory_stocks(symbol, interval='1min'):
+def downloadHistory_stocks(symbol, directory_name, interval='1min'):
     try:
         ts = TimeSeries(key='055UMQXJRDY71RG3', output_format='pandas')
         data, meta_data = ts.get_intraday(
@@ -45,7 +46,7 @@ def downloadHistory_stocks(symbol, interval='1min'):
             cumulative_volume += float(line[3])
             DataTemp.append(
                 ",".join([date] + line + [str(cumulative_total / cumulative_volume)]) + "\n")
-        write_csv(file_name="data/" + symbol + ".csv", data=DataTemp)
+        write_csv(file_name=directory_name + symbol + ".csv", data=DataTemp)
     except ValueError:
         pass
 
@@ -65,7 +66,7 @@ def get_symbols(directory_name):
 
 
 # Get data for all stocks below some price
-def get_data():
+def get_data(directory_name="data/current_data/"):
     get_symbols("data/symbols/")
     for filename in glob.glob(os.path.join("data/symbols/", '*.csv')):
         df = read_csv(file_name=filename, names=[
@@ -74,7 +75,7 @@ def get_data():
             symbols = chunk["Symbol"].values.tolist()
             for s in symbols:
                 print("Downloading data for ", s)
-                downloadHistory_stocks(s)
+                downloadHistory_stocks(s, directory_name=directory_name)
 
     return
 
