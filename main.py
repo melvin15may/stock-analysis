@@ -1,7 +1,10 @@
 import dataCollection as dc
 import recognizer as rz
 import genetic_algo as ga
+<<<<<<< HEAD
 import template_patterns as tp
+=======
+>>>>>>> e6c3bd4af942bbbd17067caccfe4891daa0e5e03
 import pandas as pd
 import sys
 import glob
